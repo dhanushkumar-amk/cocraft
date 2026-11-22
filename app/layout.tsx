@@ -26,6 +26,7 @@ const bricolage = Bricolage_Grotesque({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.cocraft.site"),
   title: "Cocraft: Agentic Workspace",
   description:
     "An AI agent that draws and writes alongside you and your team, live.",
