@@ -35,6 +35,8 @@ export class SupabaseYjsProvider {
     this.awareness = new Awareness(doc);
     this.channel = supabase.channel(`doc:${roomId}`, { config: { broadcast: { self: false } } });
 
+    // Open the saved document even if Realtime never reports a connection status.
+    this.readyTimeout = setTimeout(this.markReady, 3000);
     this.channel
       .on("broadcast", { event: "update" }, ({ payload }) => {
         Y.applyUpdate(this.doc, fromBase64(payload.update), this);

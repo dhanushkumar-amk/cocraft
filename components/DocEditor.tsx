@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import * as Y from "yjs";
@@ -83,7 +84,9 @@ function CollaborativeEditor({
     const save = () => {
       timeout = undefined;
       const content = JSON.parse(JSON.stringify(editor.document)) as Prisma.InputJsonValue;
-      saveDocContent(workspaceId, toBase64(Y.encodeStateAsUpdate(doc)), content);
+      void saveDocContent(workspaceId, toBase64(Y.encodeStateAsUpdate(doc)), content).catch(() => {
+        toast.error("Document could not be saved. Check your connection, then make an edit to retry.", { id: "document-save-error" });
+      });
     };
     const handleUpdate = (_update: Uint8Array, origin: unknown) => {
       if (origin === provider) return;

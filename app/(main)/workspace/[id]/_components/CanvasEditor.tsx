@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -27,7 +27,7 @@ import {
   type TLEditorSnapshot,
   type TLComponents,
 } from "tldraw";
-import { useSync, useSyncDemo } from "@tldraw/sync";
+import { useSync } from "@tldraw/sync";
 import "tldraw/tldraw.css";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { saveCanvasContent } from "@/actions/canvas";
@@ -43,45 +43,33 @@ const STICKY_COLORS = ["yellow", "light-blue", "light-green", "light-red", "ligh
 
 const shapeUtils = [EntityTableShapeUtil, ServiceGeoShapeUtil];
 
-// Our own sync server (the tldraw-sync/ Cloudflare Worker). Without it, tldraw's public demo
-// server is used: fine for trying things out, but rooms there are public and get wiped.
+// A configured worker enables collaboration. Otherwise use a local store backed by
+// workspace snapshots, so editor startup never depends on the public demo service.
 const SYNC_URL = process.env.NEXT_PUBLIC_TLDRAW_SYNC_URL;
-
-// Unlike useSyncDemo, useSync doesn't add tldraw's built-in shapes itself. Built once here:
-// a new array on every render would make useSync rebuild the store in a loop.
 const syncShapeUtils = [...defaultShapeUtils.filter((util) => util.type !== "geo"), ...shapeUtils];
-// Passing a schema bypasses useSyncDemo's unconditional addition of built-in utilities.
 const syncSchema = createTLStore({
   shapeUtils: syncShapeUtils,
   bindingUtils: defaultBindingUtils,
 }).schema;
+type SyncOptions = { roomId: string; users?: Parameters<typeof useSync>[0]["users"] };
 
-type SyncOptions = { roomId: string; users?: Parameters<typeof useSyncDemo>[0]["users"] };
-
-// Chosen once at load, so it's always the same hook. Images are stored inside the room.
 const useCanvasSync = SYNC_URL
   ? ({ roomId, users }: SyncOptions) =>
       useSync({
-        uri: `${SYNC_URL}/connect/${roomId}`,
+        uri: `${SYNC_URL.replace(/\/$/, "")}/connect/${roomId}`,
         assets: inlineBase64AssetStore,
-        shapeUtils: syncShapeUtils,
-        bindingUtils: defaultBindingUtils,
-        users,
-      })
-  : ({ roomId, users }: SyncOptions) => {
-      // The demo hook forwards additional store options to useSync.
-      // Embed images in the persisted canvas instead of uploading to its restricted host.
-      const options = {
-        roomId,
         schema: syncSchema,
         users,
+      })
+  : function useLocalCanvasStore() {
+      const [store] = useState(() => createTLStore({
+        schema: syncSchema,
         assets: inlineBase64AssetStore,
-      };
-      return useSyncDemo(options);
+      }));
+      return store;
     };
 
-// A cleaner, single-page canvas: no style panel, page menu or main menu, and a vertical toolbar
-// on the left with our Add table button.
+// Single-page canvas controls and component explanations.
 function CanvasContextMenu() {
   const editor = useEditor();
   const hasSelection = useValue("explain selection", () => editor.getSelectedShapeIds().length > 0, [editor]);
@@ -120,6 +108,7 @@ export function CanvasEditor({
   initialSnapshot: TLEditorSnapshot | null;
 }) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const { setCanvasEditor } = useWorkspaceEditors();
   const { user } = useUser();
 
@@ -184,17 +173,18 @@ export function CanvasEditor({
       if (shapes.size && [...shapes].every((id) => outside.has(id))) editor.zoomToFit();
     });
 
-    editor.store.listen(
+    const removeAutosave = editor.store.listen(
       () => {
         if (saveTimeout.current) clearTimeout(saveTimeout.current);
         saveTimeout.current = setTimeout(() => {
+          saveTimeout.current = null;
           // getSnapshot() carries non-plain internals (schema is a class instance, not JSON) that
           // occasionally fail to cross the Server Action boundary as "opaque temporary reference"
           // errors â€” round-tripping through JSON strips those and leaves genuinely plain data.
           const plainSnapshot = JSON.parse(
             JSON.stringify(editor.getSnapshot())
           ) as Prisma.InputJsonValue;
-          void saveCanvasContent(workspaceId, plainSnapshot).catch(() => {
+          saveQueue.current = saveQueue.current.then(() => saveCanvasContent(workspaceId, plainSnapshot)).catch(() => {
             toast.error("Canvas could not be saved. Check your connection or reduce image sizes, then make an edit to retry.", {
               id: "canvas-save-error",
             });
@@ -205,7 +195,7 @@ export function CanvasEditor({
     );
 
     // Arrows drawn onto an ERD table snap to the nearest row (see snapArrowToRow.ts).
-    editor.store.listen(
+    const removeArrowSnapping = editor.store.listen(
       (entry) => {
         for (const record of Object.values(entry.changes.added)) {
           if (record.typeName === "binding" && record.type === "arrow") {
@@ -218,6 +208,16 @@ export function CanvasEditor({
 
     // Clear it on unmount (e.g. switching to the Document view) so nothing keeps a disposed editor.
     return () => {
+      removeAutosave();
+      removeArrowSnapping();
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+        const snapshot = JSON.parse(JSON.stringify(editor.getSnapshot())) as Prisma.InputJsonValue;
+        saveQueue.current = saveQueue.current.then(() => saveCanvasContent(workspaceId, snapshot)).catch(() => {
+          toast.error("Your latest canvas changes could not be saved.", { id: "canvas-save-error" });
+        });
+        saveTimeout.current = null;
+      }
       removeStickyColors();
       cancelAnimationFrame(frame);
       setCanvasEditor(null);

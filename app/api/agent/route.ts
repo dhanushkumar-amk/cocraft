@@ -76,7 +76,7 @@ type AgentStreamArgs = Omit<Parameters<typeof streamText>[0], "model" | "message
 async function streamWithFallback(args: AgentStreamArgs) {
   for (const { provider, model } of configuredModels()) {
     if (args.abortSignal?.aborted) throw args.abortSignal.reason;
-    const result = streamText({ ...args, model, maxRetries: 0 });
+    const result = streamText({ ...args, model, maxRetries: 0, timeout: { firstChunkMs: 20000, chunkMs: 30000 } });
     const reader = result.fullStream.getReader();
     const pending: (typeof result.fullStream extends ReadableStream<infer Part> ? Part : never)[] = [];
     try {

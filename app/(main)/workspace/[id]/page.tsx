@@ -8,7 +8,7 @@ import { canAccessWorkspace } from "@/lib/workspace-access";
 import { Button } from "@/components/ui/button";
 import { EditableWorkspaceName } from "./_components/EditableWorkspaceName";
 import { DocEditor } from "@/components/DocEditorLoader";
-import { CanvasEditor } from "./_components/CanvasEditor";
+import { CanvasEditor } from "./_components/CanvasEditorLoader";
 import { AgentToggleButton } from "./_components/AgentToggleButton";
 import { ShareDialog } from "./_components/ShareDialog";
 import { getEntitlements, workspaceOwnerId, workspaceOwnerSelect } from "@/lib/billing";
@@ -106,7 +106,7 @@ export default async function WorkspacePage({
 
         {/* Keep editors mounted across view changes so active agent tools retain their targets. */}
         <ResizablePanelGroup orientation="horizontal" className="flex-1">
-          <ResizablePanel defaultSize={35} minSize={20} className={!showDoc ? "hidden!" : !showCanvas ? "flex-1!" : undefined}>
+          <ResizablePanel id="document" defaultSize={35} minSize={20} className={!showDoc ? "hidden!" : !showCanvas ? "flex-1!" : undefined}>
               <DocEditor
                 key={id}
                 workspaceId={id}
@@ -117,7 +117,7 @@ export default async function WorkspacePage({
               />
           </ResizablePanel>
           {showDoc && showCanvas && <ResizableHandle withHandle />}
-          <ResizablePanel defaultSize={65} minSize={20} className={!showCanvas ? "hidden!" : !showDoc ? "flex-1!" : undefined}>
+          <ResizablePanel id="canvas" defaultSize={65} minSize={20} className={!showCanvas ? "hidden!" : !showDoc ? "flex-1!" : undefined}>
               <CanvasEditor
                 workspaceId={id}
                 initialSnapshot={workspace.canvas?.content as TLEditorSnapshot | null}
