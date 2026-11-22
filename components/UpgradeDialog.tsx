@@ -7,8 +7,8 @@ import { PricingPlans } from "@/components/PricingPlans";
 type UpgradeReason = { title: string; description?: string };
 
 const DEFAULT_REASON: UpgradeReason = {
-  title: "Upgrade your plan",
-  description: "Get more agent prompts, unlimited workspaces, share links and PDF export.",
+  title: "Buy tokens",
+  description: "?1 per token. Choose 100?500 tokens per purchase.",
 };
 
 const UpgradeDialogContext = createContext<(reason?: UpgradeReason) => void>(() => {});
@@ -28,8 +28,7 @@ export function UpgradeDialogProvider({ children }: { children: ReactNode }) {
             <DialogTitle className="text-2xl">{reason?.title}</DialogTitle>
             {reason?.description && <DialogDescription>{reason.description}</DialogDescription>}
           </DialogHeader>
-          {/* Close first: this dialog blocks clicks outside itself, including Clerk's checkout drawer. */}
-          <PricingPlans onCheckoutStart={close} />
+          <PricingPlans />
         </DialogContent>
       </Dialog>
     </UpgradeDialogContext.Provider>

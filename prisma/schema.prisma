@@ -112,3 +112,24 @@ model DodoSubscription {
 
   @@index([ownerId])
 }
+
+model TokenWallet {
+  ownerId String @id
+  balance Int @default(0)
+  purchased Int @default(0)
+}
+
+model TokenOrder {
+  id String @id @default(cuid())
+  ownerId String
+  quantity Int
+  productId String
+  paymentId String? @unique
+  createdAt DateTime @default(now())
+}
+
+model TokenSpend {
+  id String @id
+  ownerId String
+  createdAt DateTime @default(now())
+}

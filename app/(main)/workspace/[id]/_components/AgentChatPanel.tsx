@@ -134,13 +134,13 @@ export function AgentChatPanel({ chat, isReady }: { chat: WorkspaceAgentChat; is
               <p className="rounded-md border border-white/10 bg-white/3 px-3 py-2 text-xs text-muted-foreground">
                 {error.message.includes(PROMPT_LIMIT_ERROR) ? (
                   <>
-                    You&apos;re out of agent prompts this month.{" "}
+                    You&apos;re out of tokens.{" "}
                     <button
                       type="button"
                       onClick={() => openUpgrade(UPGRADE_REASONS.prompts)}
                       className="font-medium text-primary hover:underline"
                     >
-                      Upgrade
+                      Buy tokens
                     </button>
                   </>
                 ) : (

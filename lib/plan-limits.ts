@@ -10,7 +10,7 @@ export const PROMPT_LIMIT_ERROR = "prompt_limit_reached";
 export const UPGRADE_REASONS = {
   prompts: {
     title: "You're out of agent prompts",
-    description: "This workspace's plan has used all its prompts for this month. Upgrade for more.",
+    description: "This account has no tokens remaining. Buy 100?500 tokens at ?1 each.",
   },
   workspaces: {
     title: `You've reached ${FREE_WORKSPACE_LIMIT} workspaces`,

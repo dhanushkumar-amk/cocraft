@@ -1,3 +1,4 @@
+import { spendToken, refundToken } from "@/lib/tokens";
 import { google } from "@ai-sdk/google";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createUIMessageStreamResponse, toUIMessageStream, streamText, convertToModelMessages, type LanguageModel, type UIMessage } from "ai";
@@ -5,7 +6,7 @@ import { agentToolDefs } from "@/lib/agent-tools";
 import { PROMPT_LIMIT_ERROR } from "@/lib/plan-limits";
 import { checkUser } from "@/actions/check-user";
 import { canAccessWorkspace } from "@/lib/workspace-access";
-import { getPromptUsage, getWorkspaceOwnerId, recordPrompt } from "@/lib/billing";
+import { getWorkspaceOwnerId, recordPrompt } from "@/lib/billing";
 
 const SYSTEM_PROMPT = `You are Cocraft's workspace agent. A workspace has two surfaces: a canvas (an infinite whiteboard for diagrams) and a doc (a rich-text document). For edit requests, change them by calling tools. For questions asking what a selected component does, explain its role and connections in plain language without changing the workspace. Never use em dashes in your replies.
 
@@ -128,14 +129,12 @@ export async function POST(req: Request) {
 
   if (!(await canAccessWorkspace(workspaceId))) return new Response("Workspace not found", { status: 404 });
 
-  // Only a message the user typed counts as a prompt; the automatic follow-ups after tool calls
-  // end with the agent's own message, so a prompt that draws 20 shapes still counts once.
-  let ownerId: string | null = null;
-  if (messages.at(-1)?.role === "user") {
-    ownerId = await getWorkspaceOwnerId(workspaceId);
-    const { used, limit } = await getPromptUsage(ownerId);
-    // Checked before calling Gemini, so an exhausted plan costs nothing.
-    if (used >= limit) return Response.json({ error: PROMPT_LIMIT_ERROR, used, limit }, { status: 402 });
+  const ownerId = await getWorkspaceOwnerId(workspaceId);
+  const userMessage = messages.findLast((message) => message.role === "user");
+  if (!userMessage?.id) return new Response("Missing user message", { status: 400 });
+  const spendId = `${workspaceId}:${userMessage.id}`;
+  if (!(await spendToken(ownerId, spendId))) {
+    return Response.json({ error: PROMPT_LIMIT_ERROR }, { status: 402 });
   }
 
   let stream;
@@ -148,10 +147,11 @@ export async function POST(req: Request) {
       messages: await convertToModelMessages(messages),
       abortSignal: req.signal,
       onFinish: async ({ finishReason }) => {
-        if (ownerId && finishReason !== "error") await recordPrompt(ownerId, user.id, workspaceId);
+        if (messages.at(-1)?.role === "user" && finishReason !== "error") await recordPrompt(ownerId, user.id, workspaceId);
       },
     });
   } catch (error) {
+    if (messages.at(-1)?.role === "user") await refundToken(ownerId, spendId);
     console.error("All configured agent providers failed", error);
     return Response.json({ error: "All configured AI providers are unavailable. Check your model settings and try again." }, { status: 503 });
   }

@@ -1,0 +1,5 @@
+CREATE TABLE "TokenWallet" ("ownerId" TEXT PRIMARY KEY, "balance" INTEGER NOT NULL DEFAULT 0, "purchased" INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE "TokenOrder" ("id" TEXT PRIMARY KEY, "ownerId" TEXT NOT NULL, "quantity" INTEGER NOT NULL, "productId" TEXT NOT NULL, "paymentId" TEXT UNIQUE, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE "TokenSpend" ("id" TEXT PRIMARY KEY, "ownerId" TEXT NOT NULL, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+ALTER TABLE "TokenWallet" ADD CONSTRAINT "TokenWallet_balance_check" CHECK ("balance" >= 0);
+ALTER TABLE "TokenOrder" ADD CONSTRAINT "TokenOrder_quantity_check" CHECK ("quantity" BETWEEN 100 AND 500);
