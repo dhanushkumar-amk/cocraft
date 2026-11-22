@@ -30,7 +30,7 @@ export function DocEditor({ workspaceId, initialContent, initialState }: DocEdit
   const { user } = useUser();
   const collab = useCollaborativeDoc(workspaceId, initialState);
 
-  if (!collab || !user) {
+  if (!collab) {
     return <div className="p-6 text-sm text-muted-foreground">Loading document...</div>;
   }
 
@@ -40,7 +40,7 @@ export function DocEditor({ workspaceId, initialContent, initialState }: DocEdit
       initialContent={initialContent}
       doc={collab.doc}
       provider={collab.provider}
-      user={{ name: user.fullName ?? user.username ?? "Anonymous", color: colorForUser(user.id) }}
+      user={{ name: user?.fullName ?? user?.username ?? "You", color: colorForUser(user?.id ?? workspaceId) }}
     />
   );
 }

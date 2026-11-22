@@ -18,7 +18,7 @@ import { submitOnEnter } from "@/lib/utils";
 export function AgentChatPanel({ chat, isReady }: { chat: WorkspaceAgentChat; isReady: boolean }) {
   const [input, setInput] = useState("");
   const { messages, sendMessage, stop, status, error } = chat;
-  const { canvasEditor } = useWorkspaceEditors();
+  const { canvasEditor, docEditor } = useWorkspaceEditors();
   const openUpgrade = useUpgradeDialog();
 
   const isBusy = status === "submitted" || status === "streaming";
@@ -150,7 +150,7 @@ export function AgentChatPanel({ chat, isReady }: { chat: WorkspaceAgentChat; is
             )}
           </div>
 
-          {!isReady && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Opening the document and canvas. Your message can be sent when both are ready.</p>}
+          {!isReady && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{!canvasEditor && !docEditor ? "Loading document and canvas?" : !canvasEditor ? "Loading canvas?" : "Loading document?"}</p>}
           <div className="flex shrink-0 items-end gap-2 border-t border-white/6 p-3">
             <textarea
               value={input}

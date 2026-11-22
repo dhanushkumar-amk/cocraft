@@ -16,9 +16,15 @@ export function useCollaborativeDoc(workspaceId: string, initialState: string | 
   useEffect(() => {
     const doc = new Y.Doc();
     if (savedState) Y.applyUpdate(doc, fromBase64(savedState));
-    const provider = new SupabaseYjsProvider(doc, workspaceId, () => setCollab({ doc, provider }));
+    // Saved state is enough to edit. Realtime synchronization runs in the background.
+    const provider = new SupabaseYjsProvider(doc, workspaceId, () => {});
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setCollab({ doc, provider });
+    });
 
     return () => {
+      cancelled = true;
       provider.destroy();
       doc.destroy();
     };
