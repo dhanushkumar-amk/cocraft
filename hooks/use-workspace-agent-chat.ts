@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Box, type Editor, type TLShapeId } from "tldraw";
@@ -35,7 +35,7 @@ export function useWorkspaceAgentChat(workspaceId: string, editors: Editors) {
   const editedShapes = useRef(new Set<TLShapeId>());
   const openUpgrade = useUpgradeDialog();
   const editorsRef = useRef(editors);
-  useEffect(() => {
+  useLayoutEffect(() => {
     editorsRef.current = editors;
   });
 

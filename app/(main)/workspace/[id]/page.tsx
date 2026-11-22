@@ -104,10 +104,9 @@ export default async function WorkspacePage({
           </div>
         </header>
 
-        {/* key gives each view a fresh panel group, so an old layout isn't applied to new panels */}
-        <ResizablePanelGroup key={view} orientation="horizontal" className="flex-1">
-          {showDoc && (
-            <ResizablePanel defaultSize={35} minSize={20}>
+        {/* Keep editors mounted across view changes so active agent tools retain their targets. */}
+        <ResizablePanelGroup orientation="horizontal" className="flex-1">
+          <ResizablePanel defaultSize={35} minSize={20} className={!showDoc ? "hidden!" : !showCanvas ? "flex-1!" : undefined}>
               <DocEditor
                 key={id}
                 workspaceId={id}
@@ -116,17 +115,14 @@ export default async function WorkspacePage({
                   workspace.doc?.yjsState ? Buffer.from(workspace.doc.yjsState).toString("base64") : null
                 }
               />
-            </ResizablePanel>
-          )}
+          </ResizablePanel>
           {showDoc && showCanvas && <ResizableHandle withHandle />}
-          {showCanvas && (
-            <ResizablePanel defaultSize={75} minSize={20}>
+          <ResizablePanel defaultSize={65} minSize={20} className={!showCanvas ? "hidden!" : !showDoc ? "flex-1!" : undefined}>
               <CanvasEditor
                 workspaceId={id}
                 initialSnapshot={workspace.canvas?.content as TLEditorSnapshot | null}
               />
-            </ResizablePanel>
-          )}
+          </ResizablePanel>
         </ResizablePanelGroup>
       </div>
     </WorkspaceEditorsProvider>
