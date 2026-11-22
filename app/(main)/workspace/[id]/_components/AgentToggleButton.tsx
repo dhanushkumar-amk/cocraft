@@ -17,7 +17,7 @@ import { useWorkspaceAgentChat } from "@/hooks/use-workspace-agent-chat";
 export function AgentToggleButton({ workspaceId, initialPrompt }: { workspaceId: string; initialPrompt?: string }) {
   const [isOpen, setIsOpen] = useState(!!initialPrompt);
   const { canvasEditor, docEditor } = useWorkspaceEditors();
-  const chat = useWorkspaceAgentChat(workspaceId, { canvasEditor, docEditor });
+  const chat = useWorkspaceAgentChat(workspaceId);
   const explainSelection = () => {
     if (!canvasEditor?.getSelectedShapeIds().length || chat.status === "streaming" || chat.status === "submitted") return;
     const selection = canvasEditor.getSelectedShapes().map(summarizeShape).join("\n");

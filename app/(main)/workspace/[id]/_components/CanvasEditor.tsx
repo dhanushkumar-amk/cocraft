@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -86,9 +86,16 @@ function CanvasContextMenu() {
   );
 }
 
+function CanvasControls() {
+  const editor = useEditor();
+  const { registerCanvasEditor } = useWorkspaceEditors();
+  useEffect(() => registerCanvasEditor(editor), [editor, registerCanvasEditor]);
+  return <ServiceIconPicker />;
+}
+
 const components: TLComponents = {
   ContextMenu: CanvasContextMenu,
-  InFrontOfTheCanvas: ServiceIconPicker,
+  InFrontOfTheCanvas: CanvasControls,
 
   PageMenu: null,
   MainMenu: null,
@@ -109,7 +116,6 @@ export function CanvasEditor({
 }) {
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
-  const { setCanvasEditor } = useWorkspaceEditors();
   const { user } = useUser();
 
   // Gives other collaborators this user's real name/avatar on their cursor instead of "New User".
@@ -150,7 +156,6 @@ export function CanvasEditor({
   const store = useCanvasSync({ roomId: `outpost-${workspaceId}`, users });
 
   const handleMount = (editor: Editor) => {
-    setCanvasEditor(editor);
     // Seed from Postgres only when the room is empty, so a joining user doesn't overwrite
     // what others have already drawn.
     if (initialSnapshot && editor.getCurrentPageShapeIds().size === 0) {
@@ -220,7 +225,6 @@ export function CanvasEditor({
       }
       removeStickyColors();
       cancelAnimationFrame(frame);
-      setCanvasEditor(null);
     };
   };
 

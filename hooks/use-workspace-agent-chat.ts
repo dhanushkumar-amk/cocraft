@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { Box, type Editor, type TLShapeId } from "tldraw";
@@ -10,6 +11,7 @@ import { PROMPT_LIMIT_ERROR, UPGRADE_REASONS } from "@/lib/plan-limits";
 import { executeCanvasTool, summarizeCanvas, type ShapeIdMap } from "@/lib/agent-canvas";
 import { executeDocTool, summarizeDoc } from "@/lib/agent-doc";
 import { refreshPromptUsage } from "@/components/PlanButton";
+import { useWorkspaceEditors } from "@/components/WorkspaceEditorsContext";
 import { useUpgradeDialog } from "@/components/UpgradeDialog";
 
 type Editors = { canvasEditor: Editor | null; docEditor: BlockNoteEditor | null };
@@ -30,25 +32,26 @@ function runTool({ canvasEditor, docEditor }: Editors, idMap: ShapeIdMap, toolNa
   }
 }
 
-export function useWorkspaceAgentChat(workspaceId: string, editors: Editors) {
+export function useWorkspaceAgentChat(workspaceId: string) {
   const idMap = useRef<ShapeIdMap>(new Map());
   const editedShapes = useRef(new Set<TLShapeId>());
   const openUpgrade = useUpgradeDialog();
-  const editorsRef = useRef(editors);
-  useLayoutEffect(() => {
-    editorsRef.current = editors;
-  });
+  const { getEditors } = useWorkspaceEditors();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   // Built once, so it reads the latest editors on each request: every request (including the
   // automatic follow-ups after tool calls) carries the current state of both surfaces.
   const [transport] = useState(
     // The ref is only read when a request is sent, never during render.
-    // eslint-disable-next-line react-hooks/refs
     () =>
       new DefaultChatTransport({
         api: "/api/agent",
         body: () => {
-          const { canvasEditor, docEditor } = editorsRef.current;
+          const { canvasEditor, docEditor } = getEditors();
           return {
             workspaceId,
             canvasContext: canvasEditor ? summarizeCanvas(canvasEditor) : null,
@@ -60,9 +63,10 @@ export function useWorkspaceAgentChat(workspaceId: string, editors: Editors) {
 
   const chat = useChat({
     transport,
+    id: workspaceId,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onFinish: () => {
-      const editor = editorsRef.current.canvasEditor;
+      const editor = getEditors().canvasEditor;
       if (editor && editedShapes.current.size) {
         const bounds = [...editedShapes.current].flatMap((id) => editor.getShapePageBounds(id) ?? []);
         if (bounds.length) editor.zoomToBounds(Box.Common(bounds), { inset: 64, targetZoom: 1, animation: { duration: 200 } });
@@ -75,8 +79,22 @@ export function useWorkspaceAgentChat(workspaceId: string, editors: Editors) {
       refreshPromptUsage();
       openUpgrade(UPGRADE_REASONS.prompts);
     },
-    onToolCall: ({ toolCall }) => {
-      const output = runTool(editorsRef.current, idMap.current, toolCall.toolName, toolCall.input);
+    onToolCall: async ({ toolCall }) => {
+      const needsDoc = toolCall.toolName in docToolDefs;
+      const available = () => {
+        const current = getEditors();
+        return needsDoc ? !!current.docEditor : !!current.canvasEditor && !current.canvasEditor.isDisposed;
+      };
+      for (let attempt = 0; mounted.current && !available() && attempt < 100; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      if (!mounted.current) return;
+      if (!available()) {
+        toast.error("The workspace editor disconnected. Reload the workspace before retrying.", { id: "agent-editor-unavailable" });
+        void chat.stop();
+        return;
+      }
+      const output = runTool(getEditors(), idMap.current, toolCall.toolName, toolCall.input);
       if (output.success && !(toolCall.toolName in docToolDefs) && toolCall.toolName !== "deleteShape") {
         const input = toolCall.input as { id?: string; tableId?: string };
         const key = input.id ?? input.tableId;

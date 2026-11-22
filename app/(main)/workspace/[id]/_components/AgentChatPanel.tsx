@@ -151,6 +151,11 @@ export function AgentChatPanel({ chat, isReady }: { chat: WorkspaceAgentChat; is
           </div>
 
           {!isReady && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">{!canvasEditor && !docEditor ? "Loading document and canvas?" : !canvasEditor ? "Loading canvas?" : "Loading document?"}</p>}
+          {!isReady && (
+            <button type="button" className="mx-4 mb-2 rounded border px-3 py-2 text-xs" onClick={() => window.dispatchEvent(new Event("cocraft:retry-canvas"))}>
+              Retry canvas
+            </button>
+          )}
           <div className="flex shrink-0 items-end gap-2 border-t border-white/6 p-3">
             <textarea
               value={input}

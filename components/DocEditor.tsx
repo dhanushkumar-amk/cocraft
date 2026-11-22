@@ -64,11 +64,10 @@ function CollaborativeEditor({
   });
 
   // Publish the live editor so the Share dialog can export it.
-  const { setDocEditor } = useWorkspaceEditors();
+  const { registerDocEditor } = useWorkspaceEditors();
   useEffect(() => {
-    setDocEditor(editor);
-    return () => setDocEditor(null);
-  }, [editor, setDocEditor]);
+    return registerDocEditor(editor);
+  }, [editor, registerDocEditor]);
 
   // Docs saved before collaboration existed only have JSON — import it once into the shared doc.
   useEffect(() => {
