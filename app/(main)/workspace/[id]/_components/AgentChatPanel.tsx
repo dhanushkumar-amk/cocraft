@@ -150,12 +150,13 @@ export function AgentChatPanel({ chat, isReady }: { chat: WorkspaceAgentChat; is
             )}
           </div>
 
+          {!isReady && <p role="status" className="px-4 py-2 text-xs text-muted-foreground">Opening the document and canvas. Your message can be sent when both are ready.</p>}
           <div className="flex shrink-0 items-end gap-2 border-t border-white/6 p-3">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={submitOnEnter(handleSend)}
-              placeholder="Ask the agent..."
+              placeholder={isReady ? "Ask the agent..." : "Loading workspace editors?"}
               rows={1}
               disabled={!isReady}
               className="max-h-32 flex-1 resize-none rounded-md border border-white/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-ring disabled:opacity-50"

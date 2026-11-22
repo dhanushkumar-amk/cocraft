@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { summarizeShape } from "@/lib/agent-canvas";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,16 @@ export function AgentToggleButton({ workspaceId, initialPrompt }: { workspaceId:
   });
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Agent tools need mounted editors. Opening chat restores both surfaces before sending.
+  useEffect(() => {
+    if (!isOpen || !searchParams.get("view")) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("view");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [isOpen, searchParams, router, pathname]);
   const promptSent = useRef(false);
 
   // A prompt from the dashboard is sent once both editors are ready, so the agent sees both
@@ -61,7 +71,7 @@ export function AgentToggleButton({ workspaceId, initialPrompt }: { workspaceId:
           </>
         )}
       </Button>
-      {isOpen && <AgentChatPanel chat={chat} isReady={!!canvasEditor || !!docEditor} />}
+      {isOpen && <AgentChatPanel chat={chat} isReady={!!canvasEditor && !!docEditor} />}
     </>
   );
 }
