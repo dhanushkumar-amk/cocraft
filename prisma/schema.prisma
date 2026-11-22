@@ -117,6 +117,7 @@ model TokenWallet {
   ownerId String @id
   balance Int @default(0)
   purchased Int @default(0)
+  granted Int @default(0)
 }
 
 model TokenOrder {

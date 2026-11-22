@@ -21,10 +21,19 @@ export async function POST(request: Request) {
   try {
     const product = await dodo().products.retrieve(productId);
     const price = product.price;
-    if (!price || price.type !== "one_time_price" || price.currency !== "INR" ||
-        price.price !== 100 || !price.tax_inclusive || price.pay_what_you_want ||
-        price.purchasing_power_parity || (price.discount_bps ?? 0) > 0 || (price.discount ?? 0) > 0) {
-      return Response.json({ error: "Configure the token product as a fixed, tax-inclusive INR 1 purchase without product-level discounts." }, { status: 503 });
+    const issues: string[] = [];
+    if (!price || price.type !== "one_time_price") {
+      issues.push("pricing type must be One Time");
+    } else {
+      if (price.currency !== "INR") issues.push("currency must be INR");
+      if (price.price !== 100) issues.push("unit price must be INR 1.00");
+      if (!price.tax_inclusive) issues.push("Tax Inclusive must be enabled");
+      if (price.pay_what_you_want) issues.push("Pay What You Want must be disabled");
+      if (price.purchasing_power_parity) issues.push("Purchasing Power Parity must be disabled");
+      if ((price.discount_bps ?? 0) > 0 || (price.discount ?? 0) > 0) issues.push("product discount must be 0%");
+    }
+    if (issues.length) {
+      return Response.json({ error: `Dodo product settings need updating: ${issues.join("; ")}. Promotion codes can still be used at checkout.` }, { status: 503 });
     }
     const order = await prisma.tokenOrder.create({
       data: { ownerId: session.orgId ?? session.userId, quantity, productId },
@@ -39,7 +48,14 @@ export async function POST(request: Request) {
     });
     if (!checkout.checkout_url) throw new Error("Missing checkout URL");
     return Response.json({ url: checkout.checkout_url });
-  } catch {
+  } catch (error) {
+    const status = error && typeof error === "object" && "status" in error ? error.status : undefined;
+    if (status === 404) {
+      return Response.json({ error: "Dodo token product was not found. Copy its Product ID from the same Test or Live Mode as your API key and update DODO_TOKEN_PRODUCT_ID." }, { status: 503 });
+    }
+    if (status === 401 || status === 403) {
+      return Response.json({ error: "Dodo API key needs Products Read and Checkout Sessions Write permissions for the selected payment mode." }, { status: 503 });
+    }
     return Response.json({ error: "Checkout is unavailable. Please try again." }, { status: 503 });
   }
 }

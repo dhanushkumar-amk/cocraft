@@ -1,3 +1,4 @@
+import { grantWelcomeTokens } from "@/lib/tokens";
 import { prisma } from "@/lib/prisma";
 
 // Everything is scoped to an "owner": a Clerk org id for org workspaces, or a Clerk user id for
@@ -26,8 +27,9 @@ export async function getEntitlements(ownerId: string) {
 }
 
 export async function getPromptUsage(ownerId: string) {
+  await grantWelcomeTokens(ownerId);
   const wallet = await prisma.tokenWallet.findUnique({ where: { ownerId } });
-  const limit = wallet?.purchased ?? 0;
+  const limit = (wallet?.purchased ?? 0) + (wallet?.granted ?? 0);
   const remaining = wallet?.balance ?? 0;
   return { used: limit - remaining, limit, remaining, isPaid: limit > 0 };
 }

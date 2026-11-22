@@ -8,7 +8,7 @@ type UpgradeReason = { title: string; description?: string };
 
 const DEFAULT_REASON: UpgradeReason = {
   title: "Buy tokens",
-  description: "?1 per token. Choose 100?500 tokens per purchase.",
+  description: "INR 1 per token. Choose 100 to 500 tokens per purchase.",
 };
 
 const UpgradeDialogContext = createContext<(reason?: UpgradeReason) => void>(() => {});

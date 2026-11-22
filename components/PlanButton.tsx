@@ -22,7 +22,7 @@ export function PlanButton(_props: { upgradeOnlyWhenOut?: boolean }) {
     return () => { cancelled = true; clearInterval(timer); window.removeEventListener(EVENT, load); window.removeEventListener("focus", load); };
   }, [orgId]);
   if (!usage) return null;
-  return <button onClick={() => openUpgrade({ title: "Buy tokens", description: "?1 per token. Purchase between 100 and 500 tokens." })} className="rounded-full border border-white/10 px-3 py-1.5 text-xs">
+  return <button onClick={() => openUpgrade({ title: "Buy tokens", description: "INR 1 per token. Purchase between 100 and 500 tokens." })} className="rounded-full border border-white/10 px-3 py-1.5 text-xs">
     {usage.remaining} tokens <span className="ml-2 text-primary">Buy more</span>
   </button>;
 }
