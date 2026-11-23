@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Block } from "@blocknote/core";
-import type { TLEditorSnapshot } from "tldraw";
 import { prisma } from "@/lib/prisma";
 import { canAccessWorkspace } from "@/lib/workspace-access";
 import { Button } from "@/components/ui/button";
@@ -120,7 +119,7 @@ export default async function WorkspacePage({
           <ResizablePanel id="canvas" defaultSize={65} minSize={20} className={!showCanvas ? "hidden!" : !showDoc ? "flex-1!" : undefined}>
               <CanvasEditor
                 workspaceId={id}
-                initialSnapshot={workspace.canvas?.content as TLEditorSnapshot | null}
+                initialSnapshot={workspace.canvas?.content}
               />
           </ResizablePanel>
         </ResizablePanelGroup>

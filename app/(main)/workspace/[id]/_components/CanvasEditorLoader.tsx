@@ -2,7 +2,6 @@
 
 import { Component, useEffect, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
-import type { TLEditorSnapshot } from "tldraw";
 
 const LoadedCanvas = dynamic(
   () => import("./CanvasEditor").then((module) => module.CanvasEditor),
@@ -24,7 +23,7 @@ class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolea
   }
 }
 
-export function CanvasEditor(props: { workspaceId: string; initialSnapshot: TLEditorSnapshot | null }) {
+export function CanvasEditor(props: { workspaceId: string; initialSnapshot: unknown }) {
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const retry = () => setAttempt((value) => value + 1);

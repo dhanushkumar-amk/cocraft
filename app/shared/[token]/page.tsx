@@ -3,7 +3,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Block } from "@blocknote/core";
-import type { TLEditorSnapshot } from "tldraw";
 import { prisma } from "@/lib/prisma";
 import { getEntitlements, workspaceOwnerId, workspaceOwnerSelect } from "@/lib/billing";
 import { Badge } from "@/components/ui/badge";
@@ -51,7 +50,7 @@ export default async function SharedPage({ params }: PageProps<"/shared/[token]"
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={60} minSize={20}>
-          <CanvasViewer snapshot={workspace.canvas?.content as TLEditorSnapshot | null} />
+          <CanvasViewer snapshot={workspace.canvas?.content} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

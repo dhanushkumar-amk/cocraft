@@ -14,9 +14,9 @@ Built step by step in a YouTube tutorial on the **roadsidecoder** channel.<br />
 ## What you'll build
 
 - **An AI agent that works on two surfaces.** Ask for "a database schema, documented" and it draws the ERD on the canvas and writes the spec in the doc. Name a surface ("just the doc") and it sticks to it.
-- **A tldraw canvas** with a custom ERD table shape: editable columns, primary and foreign key badges, and arrows that snap to rows.
+- **An Excalidraw canvas** with editable diagrams, service icons, colored sticky notes, and agent-driven editing.
 - **A block-based doc** (BlockNote) with real-time collaboration: live cursors and edits merged with Yjs over Supabase Realtime.
-- **Real-time canvas collaboration** with live cursors, via tldraw sync.
+- **Persistent canvas scenes** with database autosave, shared viewers, and image/PDF exports.
 - **Teams with Clerk Organizations:** everyone in an org can open any of its workspaces.
 - **A dashboard** where you describe what you want to plan (typed or by voice) and land in a new workspace with the agent already working.
 - **A kanban board** of workspaces with drag and drop.
@@ -32,7 +32,7 @@ Built step by step in a YouTube tutorial on the **roadsidecoder** channel.<br />
 | Database and realtime  | [Supabase](https://supabase.com) (Postgres and Realtime)                       |
 | ORM                    | [Prisma](https://www.prisma.io)                                                |
 | AI                     | [Vercel AI SDK](https://ai-sdk.dev) with Google Gemini                         |
-| Canvas                 | [tldraw](https://tldraw.dev) and tldraw sync                                   |
+| Canvas                 | [Excalidraw](https://github.com/excalidraw/excalidraw)                                   |
 | Docs                   | [BlockNote](https://www.blocknotejs.org) and [Yjs](https://yjs.dev)            |
 | UI                     | [Tailwind CSS](https://tailwindcss.com) and [shadcn/ui](https://ui.shadcn.com) |
 
@@ -131,7 +131,7 @@ app/
   api/agent/                The agent: Gemini, tools and prompt limits
 actions/                    Server Actions (workspaces, docs, canvas, usage)
 components/                 Shared UI (a page's own components live in its _components/ folder)
-  EntityTable/              The custom ERD table shape for tldraw
+  ExcalidrawCanvas.tsx      Canvas engine, saving and interactions
 hooks/                      Agent chat, collaborative doc and more
 lib/
   agent-tools.ts            Every agent tool's description and schema
@@ -141,7 +141,7 @@ lib/
   plan-limits.ts            Free limits and upgrade messages
   supabase-yjs-provider.ts  Syncs the doc over Supabase Realtime
 prisma/                     Database schema and migrations
-tldraw-sync/                The canvas sync server (a Cloudflare Worker)
+tldraw-sync/                Historical worker source, unused by the current canvas
 ```
 
 **How the agent works:** the agent's tools have no server-side implementation. Gemini decides which tool to call, and the browser runs it against the live canvas and doc editors, so collaborators see changes appear in real time. Every request sends a compact summary of both surfaces, so the agent can edit what's already there.
@@ -159,18 +159,9 @@ Cocraft runs on free tiers out of the box. As you grow, here's how to scale each
 
 ## Deploying
 
-1. Deploy the canvas sync server (free, no domain needed) and set `NEXT_PUBLIC_TLDRAW_SYNC_URL` to the URL it prints:
-
-   ```bash
-   cd tldraw-sync
-   npm install
-   npx wrangler login
-   npm run deploy
-   ```
-
-2. Deploy to [Vercel](https://vercel.com) and add the same environment variables.
-3. Get a free **hobby license** from [tldraw.dev](https://tldraw.dev/pricing) and set `NEXT_PUBLIC_TLDRAW_LICENSE_KEY`. Without a key, tldraw shows a "Get a license for production" watermark.
-4. For real payments, connect Stripe in Clerk Billing.
+1. Deploy to Vercel with `npm run deploy` and configure the environment variables from `.env.example`.
+2. The Excalidraw canvas is bundled locally. Saved diagrams and image assets persist with the workspace in PostgreSQL.
+3. Configure Dodo Payments for token purchases and point the signed payment webhook at `/api/webhooks/dodo`.
 
 ## Scripts
 

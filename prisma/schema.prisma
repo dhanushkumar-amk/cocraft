@@ -77,7 +77,7 @@ model Doc {
 model Canvas {
   id          String   @id @default(cuid())
   workspaceId String   @unique
-  // tldraw shape/store snapshot.
+  // Versioned canvas scene, with legacy snapshot compatibility.
   content     Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

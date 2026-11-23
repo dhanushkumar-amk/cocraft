@@ -7,8 +7,9 @@ import { z } from "zod";
 
 const point = z.object({ x: z.number(), y: z.number() });
 const shapeId = (example: string) => z.string().describe(`Caller-assigned unique id, e.g. '${example}'`);
+const color = z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Optional six-digit hex color, for example #74c0fc.");
 const boxShape = (example: string) =>
-  z.object({ id: shapeId(example), position: point, width: z.number(), height: z.number(), label: z.string().optional() });
+  z.object({ id: shapeId(example), position: point, width: z.number(), height: z.number().positive(), label: z.string().optional(), color, backgroundColor: color });
 
 export const canvasToolDefs = {
   createRectangle: { description: "Create a rectangle on the canvas.", inputSchema: boxShape("rect-1") },
@@ -24,6 +25,8 @@ export const canvasToolDefs = {
       fromShapeId: z.string().describe("id of the shape this arrow starts at"),
       toShapeId: z.string().describe("id of the shape this arrow ends at"),
       label: z.string().optional(),
+      color,
+      dashed: z.boolean().optional(),
     }),
   },
   updateShape: {

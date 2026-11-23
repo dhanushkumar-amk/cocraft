@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { Box, type Editor, type TLShapeId } from "tldraw";
+import type { CanvasController as Editor } from "@/lib/canvas";
+type TLShapeId = string;
 import type { BlockNoteEditor } from "@blocknote/core";
 import { agentToolDefs, docToolDefs, fail, type ToolResult } from "@/lib/agent-tools";
 import { PROMPT_LIMIT_ERROR, UPGRADE_REASONS } from "@/lib/plan-limits";
@@ -68,8 +69,7 @@ export function useWorkspaceAgentChat(workspaceId: string) {
     onFinish: () => {
       const editor = getEditors().canvasEditor;
       if (editor && editedShapes.current.size) {
-        const bounds = [...editedShapes.current].flatMap((id) => editor.getShapePageBounds(id) ?? []);
-        if (bounds.length) editor.zoomToBounds(Box.Common(bounds), { inset: 64, targetZoom: 1, animation: { duration: 200 } });
+        editor.zoomToFit();
       }
       editedShapes.current.clear();
       refreshPromptUsage();
