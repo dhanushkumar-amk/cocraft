@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
-import type { CanvasController as Editor } from "@/lib/canvas";
+import type { Editor } from "tldraw";
 import type { BlockNoteEditor } from "@blocknote/core";
 
 type Editors = { canvasEditor: Editor | null; docEditor: BlockNoteEditor | null };

@@ -1,139 +1,100 @@
-import "@/lib/excalidraw-assets";
 import {
-  convertToExcalidrawElements, exportToCanvas, newElementWith, CaptureUpdateAction,
-} from "@excalidraw/excalidraw";
-import type { ExcalidrawImperativeAPI, BinaryFiles } from "@excalidraw/excalidraw/types";
-import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
+  AssetRecordType, b64Vecs, createShapeId, toRichText,
+  type Editor, type TLDefaultColorStyle, type TLShapePartial, type TLShape, type TLEditorSnapshot,
+} from "tldraw";
 
-export type CanvasSnapshot = { engine: "excalidraw"; elements: readonly ExcalidrawElement[]; files: BinaryFiles };
-export type CanvasShape = ExcalidrawElement;
-type Skeleton = NonNullable<Parameters<typeof convertToExcalidrawElements>[0]>[number];
+type Element = {
+  id: string; type: string; x: number; y: number; width: number; height: number;
+  angle?: number; isDeleted?: boolean; text?: string; fontSize?: number;
+  strokeColor?: string; backgroundColor?: string; strokeStyle?: string; opacity?: number;
+  containerId?: string | null; fileId?: string | null;
+  points?: [number, number][];
+  startBinding?: { elementId: string } | null; endBinding?: { elementId: string } | null;
+  name?: string;
+};
+type ExcalidrawSnapshot = {
+  engine: "excalidraw";
+  elements: Element[];
+  files?: Record<string, { dataURL: string; mimeType?: string }>;
+};
 
-export class CanvasController {
-  private disposed = false;
-  get isDisposed() { return this.disposed; }
-  activate() { this.disposed = false; }
-  dispose() { this.disposed = true; }
-  constructor(readonly api: ExcalidrawImperativeAPI) {}
-  getCurrentPageShapes() { return this.api.getSceneElements().filter((element) => !element.isDeleted); }
-  getCurrentPageShapeIds() { return new Set(this.getCurrentPageShapes().map((element) => element.id)); }
-  getSelectedShapes() {
-    const selected = this.api.getAppState().selectedElementIds;
-    return this.getCurrentPageShapes().filter((element) => selected[element.id] || (element.type === "text" && element.containerId && selected[element.containerId]));
-  }
-  getSelectedShapeIds() { return this.getSelectedShapes().map((element) => element.id); }
-  getShape(id: string) { return this.getCurrentPageShapes().find((element) => element.id === id); }
-  append(skeleton: Skeleton[]) {
-    const elements = convertToExcalidrawElements(skeleton, { regenerateIds: false });
-    const existing = this.api.getSceneElements().map((element) => {
-      const arrows = elements.filter((item) => item.type === "arrow" && (item.startBinding?.elementId === element.id || item.endBinding?.elementId === element.id));
-      if (!arrows.length) return element;
-      return newElementWith(element, { boundElements: [...(element.boundElements ?? []), ...arrows.map((arrow) => ({ id: arrow.id, type: "arrow" as const }))] });
-    });
-    this.api.updateScene({ elements: [...existing, ...elements], captureUpdate: CaptureUpdateAction.IMMEDIATELY });
-    return elements;
-  }
-  update(id: string, patch: { x?: number; y?: number; width?: number; height?: number; label?: string; strokeColor?: string }) {
-    const scene = this.api.getSceneElements();
-    const shape = this.getShape(id);
-    if (!shape) throw new Error("Unknown component");
-    const { label, ...values } = patch;
-    const geometry = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined));
-    const labels = new Set(shape.boundElements?.filter((item) => item.type === "text").map((item) => item.id));
-    this.api.updateScene({
-      elements: scene.map((element) => {
-        if (element.id === id) {
-          if (element.type === "text" && label !== undefined) {
-            return newElementWith(element, { ...geometry, text: label, originalText: label });
-          }
-          return newElementWith(element, geometry);
-        }
-        if (labels.has(element.id) && element.type === "text") {
-          return newElementWith(element, {
-            x: element.x + ((patch.x ?? shape.x) - shape.x),
-            y: element.y + ((patch.y ?? shape.y) - shape.y),
-            ...(label !== undefined && { text: label, originalText: label }),
-          });
-        }
-        return element;
-      }),
-      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-    });
-  }
-  deleteShape(id: string) {
-    const shape = this.getShape(id);
-    const removed = new Set([id, ...(shape?.boundElements?.filter((item) => item.type === "text").map((item) => item.id) ?? [])]);
-    this.api.updateScene({ elements: this.api.getSceneElements().map((element) => removed.has(element.id) ? newElementWith(element, { isDeleted: true }) : element), captureUpdate: CaptureUpdateAction.IMMEDIATELY });
-  }
-  zoomToFit(_options?: unknown) {
-    void _options;
-    if (this.getCurrentPageShapes().length) this.api.scrollToContent(undefined, { fitToContent: true, animate: true });
-  }
-  snapshot(): CanvasSnapshot {
-    return { engine: "excalidraw", elements: this.api.getSceneElements(), files: this.api.getFiles() };
-  }
-  async toImageDataUrl(_ids: string[], _options?: unknown) {
-    void _ids; void _options;
-    const canvas = await exportToCanvas({ elements: this.api.getSceneElements(), files: this.api.getFiles(), appState: { ...this.api.getAppState(), exportBackground: true, exportWithDarkMode: true }, exportPadding: 32 });
-    return { url: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
-  }
+const colors: Record<string, TLDefaultColorStyle> = {
+  "#e5e7eb": "black", "#ffffff": "black", "#1e293b": "black", "#1e1e1e": "black",
+  "#74c0fc": "light-blue", "#a5d8ff": "light-blue", "#228be6": "blue",
+  "#8ce99a": "light-green", "#b2f2bb": "light-green", "#40c057": "green",
+  "#ffa8a8": "light-red", "#fcc2d7": "light-red", "#fa5252": "red",
+  "#ffc078": "orange", "#fd7e14": "orange", "#b197fc": "light-violet",
+  "#d0bfff": "light-violet", "#7950f2": "violet", "#ffe066": "yellow", "#ffec99": "yellow",
+};
+export function canvasColor(value?: string): TLDefaultColorStyle {
+  return colors[value?.toLowerCase() ?? ""] ?? "black";
 }
 
-// Legacy snapshots remain untouched in the database until the converted scene is edited.
-export function restoreCanvas(snapshot: unknown): { elements: readonly ExcalidrawElement[]; files: BinaryFiles } {
-  if (!snapshot || typeof snapshot !== "object") return { elements: [], files: {} };
-  const saved = snapshot as Partial<CanvasSnapshot> & { document?: { store?: Record<string, LegacyRecord> } };
-  if (saved.engine === "excalidraw" && Array.isArray(saved.elements)) return { elements: saved.elements, files: saved.files ?? {} };
-  const records = Object.values(saved.document?.store ?? {});
-  const shapes = records.filter((record) => record.typeName === "shape");
-  const skeletons: Skeleton[] = [];
-  const files: BinaryFiles = {};
-  const colors: Record<string, string> = { black: "#e5e7eb", blue: "#74c0fc", green: "#8ce99a", red: "#ffa8a8", orange: "#ffc078", violet: "#b197fc", yellow: "#ffe066" };
-  for (const shape of shapes) {
-    const props = shape.props ?? {};
-    const base = { id: shape.id, x: shape.x ?? 0, y: shape.y ?? 0, width: Number(props.w ?? 220), height: Number(props.h ?? 100), angle: shape.rotation ?? 0, strokeColor: colors[String(props.color)] ?? "#e5e7eb" };
-    const tableRows = Array.isArray(props.rows) ? props.rows.map((row: { name?: string; dataType?: string }) => `${row.name ?? ""}: ${row.dataType ?? ""}`).join("\n") : "";
-    const text = legacyText(props.richText) || [props.tableName ?? props.text ?? "", tableRows].filter(Boolean).join("\n");
-    if (shape.type === "arrow") {
-      const start = props.start as { x: number; y: number } | undefined;
-      const end = props.end as { x: number; y: number } | undefined;
-      if (start && end) skeletons.push({ ...base, type: "arrow", x: base.x + start.x, y: base.y + start.y, points: [[0, 0], [end.x - start.x, end.y - start.y]], ...(text && { label: { text } }) });
-    } else if (shape.type === "text") {
-      skeletons.push({ ...base, type: "text", text: text || " ", fontSize: 24 });
-    } else if (shape.type === "image") {
-      const asset = saved.document?.store?.[String(props.assetId)];
-      const src = asset?.props?.src;
-      if (typeof src === "string" && /^(data:|https?:)/.test(src)) {
-        const id = shape.id;
-        files[id] = { id, dataURL: src, mimeType: String(asset?.props?.mimeType ?? "image/png"), created: Date.now(), lastRetrieved: Date.now() } as BinaryFiles[string];
-        skeletons.push({ ...base, type: "image", fileId: id as BinaryFiles[string]["id"] });
+// Conversion is client-side. Original database records are replaced only by a later save.
+export function loadCanvasSnapshot(editor: Editor, snapshot: unknown) {
+  if (!snapshot || typeof snapshot !== "object") return;
+  if (!("engine" in snapshot) || snapshot.engine !== "excalidraw") {
+    editor.loadSnapshot(snapshot as TLEditorSnapshot);
+    return;
+  }
+  const scene = snapshot as ExcalidrawSnapshot;
+  const elements = scene.elements.filter((element) => !element.isDeleted);
+  const ids = new Map(elements.map((element) => [element.id, createShapeId(element.id)]));
+  const shapes: TLShapePartial<TLShape>[] = [];
+  for (const element of elements) {
+    // Bound text becomes the container's editable label.
+    if (element.type === "text" && element.containerId && ids.has(element.containerId)) continue;
+    const label = elements.find((item) => item.type === "text" && item.containerId === element.id)?.text ?? element.text ?? element.name ?? "";
+    const width = Math.max(1, element.width);
+    const height = Math.max(1, element.height);
+    const base = {
+      id: ids.get(element.id)!, x: element.x, y: element.y, rotation: element.angle ?? 0,
+      opacity: (element.opacity ?? 100) / 100,
+    };
+    const color = canvasColor(element.strokeColor);
+    if (element.type === "image" && element.fileId && scene.files?.[element.fileId]) {
+      const file = scene.files[element.fileId];
+      const assetId = AssetRecordType.createId(element.fileId);
+      if (!editor.getAsset(assetId)) {
+        editor.createAssets([{
+          id: assetId, typeName: "asset", type: "image",
+          props: { name: element.fileId, src: file.dataURL, w: width, h: height, mimeType: file.mimeType ?? "image/png", isAnimated: false },
+          meta: {},
+        }]);
       }
+      shapes.push({ ...base, type: "image", props: { assetId, w: width, h: height } });
+    } else if (element.type === "arrow" || element.type === "line") {
+      const points = element.points ?? [[0, 0], [width, height]];
+      const start = points[0];
+      const end = points[points.length - 1];
+      shapes.push({ ...base, type: "arrow", props: {
+        start: { x: start[0], y: start[1] }, end: { x: end[0], y: end[1] },
+        arrowheadEnd: element.type === "line" ? "none" : "arrow",
+        color, dash: element.strokeStyle === "dashed" ? "dashed" : "solid", richText: toRichText(label),
+      } });
+    } else if (element.type === "text") {
+      const size = (element.fontSize ?? 24) <= 18 ? "s" : (element.fontSize ?? 24) <= 24 ? "m" : "l";
+      shapes.push({ ...base, type: "text", props: { richText: toRichText(label), color, size, w: width, autoSize: false } });
+    } else if (element.type === "freedraw" && element.points?.length) {
+      shapes.push({ ...base, type: "draw", props: { color, segments: [{ type: "free", path: b64Vecs.encodePoints(element.points.map(([x, y]) => ({ x, y, z: 0.5 }))) }], isComplete: true } });
     } else {
-      skeletons.push({ ...base, type: props.geo === "ellipse" ? "ellipse" : "rectangle", ...(text && { label: { text, fontSize: 20 } }), ...(shape.type === "note" && { backgroundColor: "#ffec99", strokeColor: "#1e293b", fillStyle: "solid" }) });
+      shapes.push({ ...base, type: "geo", props: {
+        geo: element.type === "ellipse" ? "ellipse" : element.type === "diamond" ? "diamond" : "rectangle",
+        w: width, h: height, richText: toRichText(label),
+        color: element.backgroundColor && element.backgroundColor !== "transparent" ? canvasColor(element.backgroundColor) : color,
+        fill: element.backgroundColor && element.backgroundColor !== "transparent" ? "semi" : "none",
+        dash: element.strokeStyle === "dashed" ? "dashed" : "solid",
+      } });
     }
   }
-  const connected = skeletons.map((skeleton): Skeleton => {
-    if (skeleton.type === "arrow") {
-      const bindings = records.filter((record) => record.typeName === "binding" && record.fromId === skeleton.id && record.toId);
-      const start = bindings.find((record) => record.props?.terminal === "start");
-      const end = bindings.find((record) => record.props?.terminal === "end");
-      return {
-        ...skeleton,
-        ...(start?.toId && { startBinding: { elementId: start.toId, focus: 0, gap: 8 } }),
-        ...(end?.toId && { endBinding: { elementId: end.toId, focus: 0, gap: 8 } }),
-      };
+  editor.createShapes(shapes);
+  for (const element of elements.filter((item) => item.type === "arrow")) {
+    for (const [terminal, binding] of [["start", element.startBinding], ["end", element.endBinding]] as const) {
+      if (!binding || !ids.has(binding.elementId)) continue;
+      editor.createBinding({
+        type: "arrow", fromId: ids.get(element.id)!, toId: ids.get(binding.elementId)!,
+        props: { terminal, normalizedAnchor: { x: 0.5, y: 0.5 }, isExact: false, isPrecise: false },
+      });
     }
-    if (skeleton.type === "rectangle" || skeleton.type === "ellipse") {
-      const attached = records.filter((record) => record.typeName === "binding" && record.toId === skeleton.id && record.fromId);
-      return { ...skeleton, boundElements: attached.map((record) => ({ id: record.fromId!, type: "arrow" as const })) };
-    }
-    return skeleton;
-  });
-  return { elements: convertToExcalidrawElements(connected, { regenerateIds: false }), files };
-}
-type LegacyRecord = { id: string; typeName: string; fromId?: string; toId?: string; type?: string; x?: number; y?: number; rotation?: number; props?: Record<string, unknown> };
-function legacyText(value: unknown): string {
-  if (!value || typeof value !== "object") return "";
-  const node = value as { text?: string; content?: unknown[] };
-  return [node.text ?? "", ...(node.content ?? []).map(legacyText)].filter(Boolean).join(" ");
+  }
 }

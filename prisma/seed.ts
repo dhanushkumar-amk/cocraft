@@ -6,6 +6,8 @@
 //
 // Workspaces that already exist (by name) are skipped.
 import { randomUUID } from "node:crypto";
+import { createTLSchema, defaultBindingSchemas, defaultShapeSchemas } from "@tldraw/tlschema";
+import { entityTableProps } from "@/components/EntityTable/EntityTableShape";
 import { prisma } from "@/lib/prisma";
 import type { WorkspaceStatus } from "@/lib/generated/prisma/enums";
 
@@ -13,6 +15,11 @@ import type { WorkspaceStatus } from "@/lib/generated/prisma/enums";
 
 type Box = { id: string; x: number; y: number; w: number; h: number };
 type Table = Box & { columns: string[] };
+
+const schema = createTLSchema({
+  shapes: { ...defaultShapeSchemas, "entity-table": { props: entityTableProps } },
+  bindings: defaultBindingSchemas,
+}).serialize();
 
 const tlId = (prefix: string) => `${prefix}:${randomUUID()}`;
 const richText = (text: string) => ({
@@ -76,7 +83,7 @@ function canvas() {
       { id: "page:page", typeName: "page", name: "Page 1", index: "a1", meta: {} },
       ...records,
     ];
-    return { document: { store: Object.fromEntries(store.map((r) => [r.id, r])) } };
+    return { document: { schema, store: Object.fromEntries(store.map((r) => [r.id, r])) } };
   };
 
   return { box, title, table, arrow, relation, snapshot };

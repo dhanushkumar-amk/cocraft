@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 
 const LoadedCanvas = dynamic(
   () => import("./CanvasEditor").then((module) => module.CanvasEditor),
-  { ssr: false, loading: () => <div role="status" className="p-6 text-sm text-muted-foreground">Loading canvas?</div> },
+  { ssr: false, loading: () => <div role="status" className="p-6 text-sm text-muted-foreground">Loading canvas...</div> },
 );
 
 class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -30,5 +30,11 @@ export function CanvasEditor(props: { workspaceId: string; initialSnapshot: unkn
     window.addEventListener("cocraft:retry-canvas", retry);
     return () => window.removeEventListener("cocraft:retry-canvas", retry);
   }, []);
+  if (process.env.NODE_ENV === "production" && !process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY) {
+    return <div role="alert" className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm">
+      <p>The canvas requires a production license for this domain.</p>
+      <p className="text-muted-foreground">Configure NEXT_PUBLIC_TLDRAW_LICENSE_KEY in the hosting settings and redeploy.</p>
+    </div>;
+  }
   return <CanvasBoundary key={`${props.workspaceId}:${attempt}`}><LoadedCanvas {...props} /></CanvasBoundary>;
 }

@@ -14,7 +14,7 @@ Built step by step in a YouTube tutorial on the **roadsidecoder** channel.<br />
 ## What you'll build
 
 - **An AI agent that works on two surfaces.** Ask for "a database schema, documented" and it draws the ERD on the canvas and writes the spec in the doc. Name a surface ("just the doc") and it sticks to it.
-- **An Excalidraw canvas** with editable diagrams, service icons, colored sticky notes, and agent-driven editing.
+- **A tldraw canvas** with editable diagrams, service icons, colored sticky notes, and agent-driven editing.
 - **A block-based doc** (BlockNote) with real-time collaboration: live cursors and edits merged with Yjs over Supabase Realtime.
 - **Persistent canvas scenes** with database autosave, shared viewers, and image/PDF exports.
 - **Teams with Clerk Organizations:** everyone in an org can open any of its workspaces.
@@ -32,7 +32,7 @@ Built step by step in a YouTube tutorial on the **roadsidecoder** channel.<br />
 | Database and realtime  | [Supabase](https://supabase.com) (Postgres and Realtime)                       |
 | ORM                    | [Prisma](https://www.prisma.io)                                                |
 | AI                     | [Vercel AI SDK](https://ai-sdk.dev) with Google Gemini                         |
-| Canvas                 | [Excalidraw](https://github.com/excalidraw/excalidraw)                                   |
+| Canvas                 | [tldraw](https://tldraw.dev)                                   |
 | Docs                   | [BlockNote](https://www.blocknotejs.org) and [Yjs](https://yjs.dev)            |
 | UI                     | [Tailwind CSS](https://tailwindcss.com) and [shadcn/ui](https://ui.shadcn.com) |
 
@@ -131,7 +131,7 @@ app/
   api/agent/                The agent: Gemini, tools and prompt limits
 actions/                    Server Actions (workspaces, docs, canvas, usage)
 components/                 Shared UI (a page's own components live in its _components/ folder)
-  ExcalidrawCanvas.tsx      Canvas engine, saving and interactions
+  ServiceIcons.tsx          Canvas service icons and component badges
 hooks/                      Agent chat, collaborative doc and more
 lib/
   agent-tools.ts            Every agent tool's description and schema
@@ -160,7 +160,7 @@ Cocraft runs on free tiers out of the box. As you grow, here's how to scale each
 ## Deploying
 
 1. Deploy to Vercel with `npm run deploy` and configure the environment variables from `.env.example`.
-2. The Excalidraw canvas is bundled locally. Saved diagrams and image assets persist with the workspace in PostgreSQL.
+2. The tldraw canvas opens locally and saves workspace snapshots to PostgreSQL. Configure NEXT_PUBLIC_TLDRAW_LICENSE_KEY for the production domain.
 3. Configure Dodo Payments for token purchases and point the signed payment webhook at `/api/webhooks/dodo`.
 
 ## Scripts

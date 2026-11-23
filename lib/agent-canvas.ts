@@ -1,55 +1,175 @@
-import type { CanvasController, CanvasShape } from "@/lib/canvas";
+import {
+  createShapeId,
+  toRichText,
+  type Editor,
+  type TLShape,
+  type TLShapeId,
+  type TLShapePartial,
+  type VecModel,
+} from "tldraw";
+import { type EntityTableShape } from "@/components/EntityTable/EntityTableShape";
+import { canvasColor } from "@/lib/canvas";
 import { canvasToolDefs, fail, normalizeModelText, ok, type ToolResult } from "@/lib/agent-tools";
 
-export type ShapeIdMap = Map<string, string>;
-export function summarizeShape(shape: CanvasShape) {
-  return `- id: ${shape.id}, type: ${shape.type}${shape.type === "text" && shape.containerId ? `, labelOf: ${shape.containerId}` : ""}, position: (${Math.round(shape.x)}, ${Math.round(shape.y)})${shape.type === "text" ? `, label: "${shape.text}"` : ""}`;
-}
-export function summarizeCanvas(editor: CanvasController) {
+// Maps the model's caller-assigned ids ("rect-1") to real tldraw ids, so later calls in the same
+// chat can reference shapes it just created. Pre-existing shapes are referenced by their real ids.
+export type ShapeIdMap = Map<string, TLShapeId>;
+
+// Compact state sent with every request, so the model only references shapes that exist.
+export function summarizeCanvas(editor: Editor) {
   const shapes = editor.getCurrentPageShapes();
-  return "Selected component ids: " + editor.getSelectedShapeIds().join(", ") + "\n" + (shapes.length ? shapes.map(summarizeShape).join("\n") : "(empty canvas)");
+  if (shapes.length === 0) return "(empty canvas)";
+  return "Selected component ids: " + editor.getSelectedShapeIds().join(", ") + "\n" + shapes.map(summarizeShape).join("\n");
 }
-export function executeCanvasTool(editor: CanvasController, ids: ShapeIdMap, name: string, raw: unknown): ToolResult {
-  const resolve = (id: string) => ids.get(id) ?? id;
-  const newId = (id: string) => {
-    const result = ids.get(id) ?? crypto.randomUUID();
-    ids.set(id, result);
-    return result;
-  };
-  switch (name) {
+
+export function summarizeShape(shape: TLShape) {
+  const base = `- id: ${shape.id}, type: ${shape.type}, position: (${Math.round(shape.x)}, ${Math.round(shape.y)})`;
+  if (shape.type === "entity-table") {
+    const { tableName, rows } = (shape as EntityTableShape).props;
+    const columns = rows.map((r) => `${r.name}:${r.dataType}${r.isPK ? " PK" : ""}${r.isFK ? " FK" : ""}`);
+    return `${base}, table: "${tableName}", columns: [${columns.join(", ")}]`;
+  }
+  const text = "richText" in shape.props ? plainText(shape.props.richText) : "";
+  return text ? `${base}, label: "${text}"` : base;
+}
+
+// tldraw's richText is a small ProseMirror JSON doc; the agent only needs its text.
+function plainText(node: unknown): string {
+  if (typeof node !== "object" || node === null) return "";
+  const { text, content } = node as { text?: string; content?: unknown[] };
+  return [text ?? "", ...(content ?? []).map(plainText)].filter(Boolean).join(" ");
+}
+
+const richText = (text: string) => toRichText(normalizeModelText(text));
+
+function resolveNewId(idMap: ShapeIdMap, callerId: string) {
+  const id = idMap.get(callerId) ?? createShapeId();
+  idMap.set(callerId, id);
+  return id;
+}
+
+function lookupShape(editor: Editor, idMap: ShapeIdMap, id: string) {
+  return editor.getShape(idMap.get(id) ?? (id as TLShapeId));
+}
+
+function createArrowBetween(
+  editor: Editor,
+  arrowId: TLShapeId,
+  from: { id: TLShapeId; anchor?: VecModel },
+  to: { id: TLShapeId; anchor?: VecModel },
+  label?: string,
+  color?: string,
+  dashed?: boolean
+) {
+  const fromBounds = editor.getShapePageBounds(from.id);
+  const toBounds = editor.getShapePageBounds(to.id);
+  if (!fromBounds || !toBounds) return fail("Could not resolve shape bounds");
+
+  editor.createShape({
+    id: arrowId,
+    type: "arrow",
+    props: {
+      color: canvasColor(color),
+      dash: dashed ? "dashed" : "solid",
+      // Plain {x, y}: tldraw records can't hold class instances like the Vec that .center returns.
+      start: { x: fromBounds.center.x, y: fromBounds.center.y },
+      end: { x: toBounds.center.x, y: toBounds.center.y },
+      ...(label && { richText: richText(label) }),
+    },
+  });
+  for (const [terminal, end] of [["start", from], ["end", to]] as const) {
+    editor.createBinding({
+      type: "arrow",
+      fromId: arrowId,
+      toId: end.id,
+      props: {
+        terminal,
+        normalizedAnchor: end.anchor ?? { x: 0.5, y: 0.5 },
+        isPrecise: !!end.anchor,
+        isExact: false,
+      },
+    });
+  }
+  return ok();
+}
+
+function fontSizeToStyle(px: number) {
+  if (px <= 18) return "s";
+  if (px <= 24) return "m";
+  if (px <= 36) return "l";
+  return "xl";
+}
+
+export function executeCanvasTool(editor: Editor, idMap: ShapeIdMap, toolName: string, rawInput: unknown): ToolResult {
+  const defs = canvasToolDefs;
+  switch (toolName) {
     case "createRectangle":
     case "createEllipse": {
-      const input = canvasToolDefs[name].inputSchema.parse(raw);
-      const id = newId(input.id);
-      if (editor.getShape(id)) return ok();
-      editor.append([{ id, type: name === "createEllipse" ? "ellipse" : "rectangle", x: input.position.x, y: input.position.y, width: input.width, height: input.height, strokeColor: input.color ?? "#e5e7eb", ...(input.backgroundColor && { backgroundColor: input.backgroundColor, fillStyle: "solid" as const }), ...(input.label && { label: { text: normalizeModelText(input.label), fontSize: 20 } }) }]);
+      const input = defs[toolName].inputSchema.parse(rawInput);
+      editor.createShape({
+        id: resolveNewId(idMap, input.id),
+        type: "geo",
+        x: input.position.x,
+        y: input.position.y,
+        props: {
+          color: canvasColor(input.backgroundColor ?? input.color),
+          fill: input.backgroundColor ? "semi" : "none",
+          geo: toolName === "createRectangle" ? "rectangle" : "ellipse",
+          w: input.width,
+          h: input.height,
+          ...(input.label && { richText: richText(input.label) }),
+        },
+      });
       return ok();
     }
+
     case "createText": {
-      const input = canvasToolDefs.createText.inputSchema.parse(raw);
-      const id = newId(input.id);
-      if (!editor.getShape(id)) editor.append([{ id, type: "text", x: input.position.x, y: input.position.y, text: normalizeModelText(input.text), fontSize: input.fontSize ?? 24, strokeColor: "#e5e7eb" }]);
+      const input = defs.createText.inputSchema.parse(rawInput);
+      editor.createShape({
+        id: resolveNewId(idMap, input.id),
+        type: "text",
+        x: input.position.x,
+        y: input.position.y,
+        props: { richText: richText(input.text), ...(input.fontSize && { size: fontSizeToStyle(input.fontSize) }) },
+      });
       return ok();
     }
+
     case "createArrow": {
-      const input = canvasToolDefs.createArrow.inputSchema.parse(raw);
-      const from = editor.getShape(resolve(input.fromShapeId));
-      const to = editor.getShape(resolve(input.toShapeId));
-      if (!from || !to) return fail("Arrow endpoints must refer to existing components.");
-      const id = newId(input.id);
-      if (!editor.getShape(id)) editor.append([{ id, type: "arrow", x: from.x + from.width / 2, y: from.y + from.height / 2, points: [[0, 0], [to.x + to.width / 2 - from.x - from.width / 2, to.y + to.height / 2 - from.y - from.height / 2]], strokeColor: input.color ?? "#e5e7eb", strokeStyle: input.dashed ? "dashed" : "solid", startBinding: { elementId: from.id, focus: 0, gap: 8 }, endBinding: { elementId: to.id, focus: 0, gap: 8 }, ...(input.label && { label: { text: input.label } }) }]);
-      return ok();
+      const input = defs.createArrow.inputSchema.parse(rawInput);
+      const from = lookupShape(editor, idMap, input.fromShapeId);
+      const to = lookupShape(editor, idMap, input.toShapeId);
+      if (!from || !to) return fail("fromShapeId or toShapeId does not refer to a known shape");
+      return createArrowBetween(editor, resolveNewId(idMap, input.id), { id: from.id }, { id: to.id }, input.label, input.color, input.dashed);
     }
+
     case "updateShape": {
-      const input = canvasToolDefs.updateShape.inputSchema.parse(raw);
-      editor.update(resolve(input.id), { x: input.position?.x, y: input.position?.y, width: input.width, height: input.height, label: input.label });
+      const input = defs.updateShape.inputSchema.parse(rawInput);
+      const shape = lookupShape(editor, idMap, input.id);
+      if (!shape) return fail("Unknown shape id");
+      // Shape type is only known at runtime, so the patch uses tldraw's loose partial type.
+      editor.updateShape({
+        id: shape.id,
+        type: shape.type,
+        ...(input.position && { x: input.position.x, y: input.position.y }),
+        props: {
+          ...(input.width && { w: input.width }),
+          ...(input.height && { h: input.height }),
+          ...(input.label && "richText" in shape.props && { richText: richText(input.label) }),
+        },
+      } as TLShapePartial<TLShape>);
       return ok();
     }
+
     case "deleteShape": {
-      const input = canvasToolDefs.deleteShape.inputSchema.parse(raw);
-      editor.deleteShape(resolve(input.id));
+      const input = defs.deleteShape.inputSchema.parse(rawInput);
+      const shape = lookupShape(editor, idMap, input.id);
+      if (!shape) return fail("Unknown shape id");
+      editor.deleteShape(shape.id);
       return ok();
     }
-    default: return fail("Unknown canvas tool: " + name);
+
+    default:
+      return fail(`Unknown canvas tool: ${toolName}`);
   }
 }
