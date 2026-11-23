@@ -26,7 +26,7 @@ export function CanvasViewer({ snapshot }: { snapshot: unknown }) {
         shapeUtils={shapeUtils}
         onMount={handleMount}
         colorScheme="dark"
-        licenseKey={process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY}
+        licenseKey={process.env.NEXT_TLDRAW_LICENSE_KEY}
       />
     </div>
   );

@@ -68,7 +68,7 @@ Fill in `.env`. Each variable has a comment saying where to find it.
 | `DIRECT_URL`                                                       | Supabase → Connect: the **direct/session** connection string (port 5432), used for migrations |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase → Project Settings → API                                                             |
 | `GOOGLE_GENERATIVE_AI_API_KEY`                                     | Google AI Studio → API keys                                                                   |
-| `NEXT_PUBLIC_TLDRAW_LICENSE_KEY`                                   | Optional in development (see [Deploying](#deploying))                                         |
+| `NEXT_TLDRAW_LICENSE_KEY`                                           | Optional in development (see [Deploying](#deploying))                                         |
 
 ### 3. Database
 
@@ -160,7 +160,7 @@ Cocraft runs on free tiers out of the box. As you grow, here's how to scale each
 ## Deploying
 
 1. Deploy to Vercel with `npm run deploy` and configure the environment variables from `.env.example`.
-2. The tldraw canvas opens locally and saves workspace snapshots to PostgreSQL. Configure NEXT_PUBLIC_TLDRAW_LICENSE_KEY for the production domain.
+2. The tldraw canvas opens locally and saves workspace snapshots to PostgreSQL. Configure NEXT_TLDRAW_LICENSE_KEY for the production domain.
 3. Configure Dodo Payments for token purchases and point the signed payment webhook at `/api/webhooks/dodo`.
 
 ## Scripts
